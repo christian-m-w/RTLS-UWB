@@ -1,8 +1,9 @@
 import serial, os
-import time, random
+import time
 from datetime import datetime, timezone
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
-from tagData import TagData, AnchorPosition, TagPosition
+from PyQt6.QtCore import QThread, pyqtSignal
+from tagData import TagData
+from utils.tagDataUtils import TagDataUtils
 
 class SerialReader(QThread):
     tag_data = pyqtSignal(TagData)
@@ -26,44 +27,42 @@ class SerialReader(QThread):
         tag.write(b'\r')
         time.sleep(0.5)
         tag.write(b'lec\r')
+        time.sleep(0.1)
 
         # Read the logging data and emit it or save to CSV
         self.running = True
-        i = 0
         
-        # log data to CSV
+        # log data to CSV - Filename format (YYYY-MM-DD-HH-MM-SS-ComPort.csv)
         if self.ENABLE_LOGGING:
+            now = datetime.now(timezone.utc)
             cwd = os.getcwd()
-            f = open(f"{cwd}\log-{time.time()}.csv", "a")
+            f = open(f"{cwd}\\{now.strftime("%Y-%m-%d-%H-%M-%S")}-{self.PORT[3]}.csv", "a")
 
         print(f"Running... {self.PORT} - {self.BAUDRATE} - {self.ENABLE_LOGGING}")
 
+        self.start_time = time.time()
         try:
             while self.running:
                 # Read the bytes from serial and convert to string
                 line = tag.readline().decode(errors='ignore').strip()
                 if not line:
                     continue
-
-                if line.startswith("DIST") == False:
+                
+                # Ignore lines without telemetry
+                if line.startswith("DIST") == False or "POS" not in line:
                     continue
 
-                now = datetime.now(timezone.utc)
-                iso_timestamp = now.isoformat(timespec='microseconds')
+                # parse serial data and add timestamp
+                elapsed_ms = round(time.time() - self.start_time, 3)
+                row = f"{elapsed_ms},{line}\n"
+                tagData = TagDataUtils.serial_toTagData(self, row.split(','))
 
-                # log data to CSV
+                # log parsed data to CSV
                 if self.ENABLE_LOGGING:
-                    f.write(f"{iso_timestamp},{line}\n")
+                    f.write(f"{TagDataUtils.tagData_ToCSV(self, tagData)}\n")
 
                 # Send the tag data signal
-                data = line.split(',')
-                print(f"{iso_timestamp},{line}")
-
-                i = i + 1
-                row = f"{iso_timestamp},{line}\n"
-                
-                self.send_tag_data(row.split(','))
-                time.sleep(0.1)
+                self.send_tag_data(tagData)
         finally:
             tag.close()
             print(f"Closing serial connection on {self.PORT}...")
@@ -71,21 +70,5 @@ class SerialReader(QThread):
     def stop(self):
         self.running = False
 
-    def send_tag_data(self, row):
-        t = TagData()
-        t.TimeStamp = row[0]
-
-        # AN0,4818,0.65,2.49,2.10,1.93
-        t.AnchorPositions = []
-        t.AnchorPositions.append(AnchorPosition(row[4], float(row[5]), float(row[6]), float(row[7]), float(row[8])))
-        t.AnchorPositions.append(AnchorPosition(row[10], float(row[11]), float(row[12]), float(row[13]), float(row[14])))
-        t.AnchorPositions.append(AnchorPosition(row[16], float(row[17]), float(row[18]), float(row[19]), float(row[20])))
-
-        # POS,1.83,3.33,2.16,47
-        if row[2] == "4": # Check number of anchors in position calculation (3 or 4)
-            t.AnchorPositions.append(AnchorPosition(row[22], float(row[23]), float(row[24]), float(row[25]), float(row[26])))
-            t.TagPosition = TagPosition(float(row[28]), float(row[29]), float(row[30]), int(row[31]))
-        else:
-            t.TagPosition = TagPosition(float(row[22]), float(row[23]), float(row[24]), int(row[25]))
-
-        self.tag_data.emit(t)
+    def send_tag_data(self, td: TagData):
+        self.tag_data.emit(td)

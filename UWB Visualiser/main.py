@@ -1,14 +1,12 @@
 import sys, os
-import time
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar
-from PyQt6.QtGui import QPainter, QPainterPath, QPen, QImage, QPixmap, QColor
-from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QPainter, QPainterPath, QPen, QPixmap, QColor
+from PyQt6.QtCore import Qt
 from PyQt6 import QtCore
 from serialReader import SerialReader
 from csvReader import CsvReader
 from tagData import TagData
 from dataclasses import dataclass
-from collections import namedtuple
 import serial.tools.list_ports
 
 @dataclass(frozen=True)
@@ -25,6 +23,8 @@ class RtlsUwbApplication(QWidget):
     # Floor Plan Origin Offset
     FP_OFFSET_X = 40
     FP_OFFSET_Y = 26
+
+    LOGFILE_DIRECTORY = "."
 
     def __init__(self):
         super().__init__()
@@ -65,7 +65,7 @@ class RtlsUwbApplication(QWidget):
         layout.addStretch()
 
         self.cmb_csv = QComboBox(self)
-        for f_name in os.listdir("."):
+        for f_name in os.listdir(f"{self.LOGFILE_DIRECTORY}"):
             if f_name.endswith(".csv"):
                 self.cmb_csv.addItem(f"{f_name}")
         layout.addWidget(self.cmb_csv)
@@ -97,7 +97,7 @@ class RtlsUwbApplication(QWidget):
 
     def start_csv_replay(self):      
         # Read CSV Log
-        self.worker_thread = CsvReader(self.cmb_csv.currentText())
+        self.worker_thread = CsvReader(f"{self.LOGFILE_DIRECTORY}/{self.cmb_csv.currentText()}")
         
         self.worker_thread.tag_data.connect(self.on_tag_data)
         self.worker_thread.start()
@@ -167,7 +167,7 @@ class RtlsUwbApplication(QWidget):
         painter.setPen(pen)
         fp_width = int(window.width() / 2)
         fp_height = window.height() - 20
-        floorplan = QPixmap("./floorplan.png")
+        floorplan = QPixmap("./UWB Visualiser/floorplan.png")
         if floorplan.isNull() == False:
             fp_scale = (window.height() - 20) / floorplan.height()
             fp_width = int(floorplan.width() * fp_scale)
