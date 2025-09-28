@@ -6,7 +6,8 @@ Required Packages:
 
 * PySerial
 * PyQt6
+* Matplotlib
 
 `pip install pyserial`
-`pip3 install pyqt6`
-
+`pip install pyqt6`
+`pip install matplotlib`
