@@ -5,7 +5,7 @@ from tagData import TagData
 from utils.tagDataUtils import TagDataUtils
 
 class CsvReader(QThread):
-    tag_data = pyqtSignal(TagData)
+    tag_data = pyqtSignal(TagData, str)
 
     def __init__(self, CSV_FILE):
         super().__init__()
@@ -20,6 +20,13 @@ class CsvReader(QThread):
             print(f"File not found: {self.CSV_FILE}")
             return
         
+        # Try and read the COM Port from the filename
+        index = self.CSV_FILE.rfind('-')
+        comPort = self.CSV_FILE[index+1:-4]
+        if comPort.isdigit() == False:
+            print(f"Unknown COM Port: {comPort}")
+            return
+
         with open(self.CSV_FILE, newline='') as csvfile:
             reader = csv.reader(csvfile)
             for row in reader:
@@ -29,7 +36,7 @@ class CsvReader(QThread):
                 try:
                     # Send the tag data signal
                     tagData = TagDataUtils.csv_toTagData(self, row)
-                    self.send_tag_data(tagData)
+                    self.send_tag_data(tagData, f"COM{comPort}")
                     
                     time.sleep(0.1)
                 except ValueError as e:
@@ -39,5 +46,5 @@ class CsvReader(QThread):
     def stop(self):
         self.running = False
 
-    def send_tag_data(self, td: TagData):
-        self.tag_data.emit(td)
+    def send_tag_data(self, td: TagData, com_port):
+        self.tag_data.emit(td, com_port)

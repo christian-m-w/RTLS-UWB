@@ -6,7 +6,7 @@ from tagData import TagData
 from utils.tagDataUtils import TagDataUtils
 
 class SerialReader(QThread):
-    tag_data = pyqtSignal(TagData)
+    tag_data = pyqtSignal(TagData, str)
 
     def __init__(self, PORT, BAUDRATE, ENABLE_LOGGING):
         super().__init__()
@@ -62,7 +62,7 @@ class SerialReader(QThread):
                     f.write(f"{TagDataUtils.tagData_ToCSV(self, tagData)}\n")
 
                 # Send the tag data signal
-                self.send_tag_data(tagData)
+                self.send_tag_data(tagData, self.PORT)
         finally:
             tag.close()
             print(f"Closing serial connection on {self.PORT}...")
@@ -70,5 +70,5 @@ class SerialReader(QThread):
     def stop(self):
         self.running = False
 
-    def send_tag_data(self, td: TagData):
-        self.tag_data.emit(td)
+    def send_tag_data(self, td: TagData, com_port):
+        self.tag_data.emit(td, com_port)
