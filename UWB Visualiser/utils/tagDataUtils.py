@@ -44,5 +44,5 @@ class TagDataUtils():
         for ap in td.AnchorPositions:
             anchorPositions += f"{ap.AnchorID},{ap.X},{ap.Y},{ap.Z},{ap.MetersFromTag},"
         
-        csvLine = f"{td.TimeStamp},{len(td.AnchorPositions)},{anchorPositions}POS,{td.TagPosition.X},{td.TagPosition.Y},{td.TagPosition.Z},{td.TagPosition.QF}"
+        csvLine = f"{td.TimeStamp},{len(td.AnchorPositions)},{anchorPositions}{td.TagPosition.X},{td.TagPosition.Y},{td.TagPosition.Z},{td.TagPosition.QF}"
         return csvLine

@@ -9,8 +9,12 @@ class guiControls():
     def CreateControlsLayout(self):
         controlsLayout = QVBoxLayout()
 
+        btn_reset = QPushButton("Reset")
+        btn_reset.clicked.connect(self.reset_data)
+        controlsLayout.addWidget(btn_reset)
+
         # Floor plan configuration
-        fp_groupBox = QGroupBox("Floorplan Configuration")
+        fp_groupBox = QGroupBox("Floorplan Configuration: ")
         fp_groupBoxLayout = QVBoxLayout()
         fp_groupBox.setLayout(fp_groupBoxLayout)
 
@@ -49,54 +53,63 @@ class guiControls():
         controlsLayout.addWidget(fp_groupBox)
 
         # Add Serial connections
-        for port in serial.tools.list_ports.comports():
-            if port.description.startswith("USB Serial Device"):
-                comPortLayout = QHBoxLayout()
-                comPort = QLabel(self)
-                comPort.setText(f"{port.name}")
-                comPortLayout.addWidget(comPort)
+        serial_groupBox = QGroupBox("Serial Connections: ")
+        serial_groupBoxLayout = QVBoxLayout()
+        serial_groupBox.setLayout(serial_groupBoxLayout)
 
-                baudrate = QLineEdit(self)
-                baudrate.setText("115200")
-                baudrate.setObjectName(f"baudrate_{port.name}")
-                comPortLayout.addWidget(baudrate)
+        for index in range(1, 5):
+            comPortLayout = QHBoxLayout()
+            comPort = QComboBox(self)
+            comPort.setObjectName(f"comPort_{index}")
+            for port in serial.tools.list_ports.comports():
+                comPort.addItem(f"{port.name}")
+            comPortLayout.addWidget(comPort)
 
-                chk_logging = QCheckBox("Enable Logging")
-                chk_logging.setChecked(True)
-                chk_logging.setObjectName(f"chk_logging_{port.name}")
-                comPortLayout.addWidget(chk_logging)
+            baudrate = QLineEdit(self)
+            baudrate.setText("115200")
+            baudrate.setObjectName(f"baudrate_{index}")
+            comPortLayout.addWidget(baudrate)
 
-                btn_connect = QPushButton("Connect")
-                btn_connect.clicked.connect(partial(self.start_serial_connection, port.name))
-                btn_connect.setObjectName(f"btn_connect_{port.name}")
-                comPortLayout.addWidget(btn_connect)
+            chk_logging = QCheckBox("Enable Logging")
+            chk_logging.setChecked(True)
+            chk_logging.setObjectName(f"chk_logging_{index}")
+            comPortLayout.addWidget(chk_logging)
 
-                btn_disconnect = QPushButton("Disconnect")
-                btn_disconnect.clicked.connect(partial(self.stop_serial_connection, port.name))
-                btn_disconnect.setObjectName(f"btn_disconnect_{port.name}")
-                btn_disconnect.setHidden(True)
-                comPortLayout.addWidget(btn_disconnect)
+            btn_connect = QPushButton("Connect")
+            btn_connect.clicked.connect(partial(self.start_serial_connection, index))
+            btn_connect.setObjectName(f"btn_connect_{index}")
+            comPortLayout.addWidget(btn_connect)
 
-                controlsLayout.addLayout(comPortLayout)
+            btn_disconnect = QPushButton("Disconnect")
+            btn_disconnect.clicked.connect(partial(self.stop_serial_connection, index))
+            btn_disconnect.setObjectName(f"btn_disconnect_{index}")
+            btn_disconnect.setHidden(True)
+            comPortLayout.addWidget(btn_disconnect)
 
+            serial_groupBoxLayout.addLayout(comPortLayout)
+        
+        controlsLayout.addWidget(serial_groupBox)
         controlsLayout.addStretch()
 
         # Logging path settings
         csv_heading = QLabel("CSV Replay")
         controlsLayout.addWidget(csv_heading)
-        c_list = ["red", "green","blue", "yellow", "orange", "purple", "cyan", "lime"]
-        
+       
         for index in range(1, 5):
             csvReplayLayout = QHBoxLayout()
+            self.lbl_comPort = QLabel("")
+            self.lbl_comPort.setObjectName(f"lbl_comPort_{index}")
+            csvReplayLayout.addWidget(self.lbl_comPort)
+
             self.cmb_colour = QComboBox(self)
-            for row, colour in enumerate(c_list):
+            for row, colour in enumerate(self.COLOURS):
                 self.cmb_colour.addItem(colour)
                 model = self.cmb_colour.model()
                 model.setData(model.index(row, 0), QtGui.QColor(colour), Qt.ItemDataRole.BackgroundRole)
             self.cmb_colour.currentTextChanged.connect(partial(self.UpdateQWidgetColour, QComboBox, f"cmb_colour_{index}"))
             csvReplayLayout.addWidget(self.cmb_colour)
             self.cmb_colour.setObjectName(f"cmb_colour_{index}")
-            self.cmb_colour.setStyleSheet(f"QWidget {{background-color: {c_list[0]};}}")
+            self.cmb_colour.setStyleSheet(f"QWidget {{background-color: {self.COLOURS[0]};}}")
 
             self.cmb_csv = QComboBox(self)
             self.cmb_csv.setObjectName(f"cmb_csv_{index}")
@@ -107,10 +120,13 @@ class guiControls():
 
             self.btn_replay = QPushButton("Replay")
             self.btn_replay.clicked.connect(partial(self.start_csv_replay, index))
+            self.btn_replay.setObjectName(f"btn_replay_{index}")
             csvReplayLayout.addWidget(self.btn_replay)
 
             self.btn_stop = QPushButton("Stop")
             self.btn_stop.clicked.connect(partial(self.stop_csv_replay, index))
+            self.btn_stop.setObjectName(f"btn_stop_{index}")
+            self.btn_stop.setEnabled(False)
             csvReplayLayout.addWidget(self.btn_stop)
             controlsLayout.addLayout(csvReplayLayout)
 
@@ -127,8 +143,12 @@ class guiControls():
         self.prgbar.setValue(0)
         controlsLayout.addWidget(self.prgbar)
 
-        self.lbl_anchors = QLabel("Anchor List:")
-        controlsLayout.addWidget(self.lbl_anchors)
+        anchor_groupBox = QGroupBox("Anchor List: ")
+        anchor_groupBoxLayout = QVBoxLayout()
+        anchor_groupBox.setLayout(anchor_groupBoxLayout)
+        self.lbl_anchors = QLabel("")
+        anchor_groupBoxLayout.addWidget(self.lbl_anchors)
+        controlsLayout.addWidget(anchor_groupBox)
 
         controlsLayout.addStretch()
         return controlsLayout

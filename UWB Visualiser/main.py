@@ -20,6 +20,7 @@ class RtlsUwbApplication(QWidget):
     REDRAW_TIMER = QTimer()
     ANCHOR_LOCATIONS = set()
     TAGS = {}
+    TAG_COLOURS = {}
     QTHREADS = {} 
 
     # Floor Plan Configuration
@@ -35,6 +36,16 @@ class RtlsUwbApplication(QWidget):
     PLOT_UPDATE_FREQUENCY_MS = 10
     ORIGIN_COLOUR = "red"
     ANCHOR_COLOUR = "red"
+    COLOURS = ["lime", "cyan", "yellow", "orange", "mediumpurple","dodgerblue","tomato"]
+
+    def reset_data(self):
+        self.stop_timer()
+
+        self.ANCHOR_LOCATIONS = set()
+        self.TAGS = {}
+        self.TAG_COLOURS = {}
+        self.QTHREADS = {}
+        self.redraw_plot()
 
     def UpdateQWidgetColour(self, type, name):
        cmb = self.findChild(type, f"{name}")
@@ -95,35 +106,57 @@ class RtlsUwbApplication(QWidget):
 
         # Read CSV Log
         fName = self.findChild(QComboBox, f"cmb_csv_{index}").currentText()       
-        self.QTHREADS.update({index: CsvReader(f"{self.LOGFILE_DIRECTORY}/{fName}")})
-        self.QTHREADS[index].tag_data.connect(self.on_tag_data)
-        self.QTHREADS[index].start()
+        self.QTHREADS.update({f"csv-{index}": CsvReader(f"{self.LOGFILE_DIRECTORY}/{fName}")})
+        self.QTHREADS[f"csv-{index}"].tag_data.connect(self.on_tag_data)
+        self.QTHREADS[f"csv-{index}"].start()
+
+        comPort = fName[fName.rfind('-')+1:-4]
+        self.findChild(QLabel, f"lbl_comPort_{index}").setText(f"COM{comPort}")
+        tagColour = self.findChild(QComboBox, f"cmb_colour_{index}").currentText()
+        self.TAG_COLOURS.update({f"COM{comPort}": tagColour})
+
+        self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(False)
+        self.findChild(QPushButton, f"btn_stop_{index}").setEnabled(True)
     
     def stop_csv_replay(self, index):
-        self.QTHREADS[index].stop()
-        self.QTHREADS[index].wait()
+        self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(True)
+        self.findChild(QPushButton, f"btn_stop_{index}").setEnabled(False)
+    
+        if f"csv-{index}" not in self.QTHREADS:
+            return
+        
+        self.QTHREADS[f"csv-{index}"].stop()
+        self.QTHREADS[f"csv-{index}"].wait()
 
-    def start_serial_connection(self, com_port):
-        self.findChild(QPushButton, f"btn_connect_{com_port}").setHidden(True)
-        self.findChild(QPushButton, f"btn_disconnect_{com_port}").setHidden(False)
-        baudrate = self.findChild(QLineEdit, f"baudrate_{com_port}")
+    def start_serial_connection(self, index):
+        self.start_timer()
+
+        self.findChild(QPushButton, f"btn_connect_{index}").setHidden(True)
+        self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(False)
+        baudrate = self.findChild(QLineEdit, f"baudrate_{index}")
         baudrate.setEnabled(False)
-        chk_logging = self.findChild(QCheckBox, f"chk_logging_{com_port}")
+        chk_logging = self.findChild(QCheckBox, f"chk_logging_{index}")
         chk_logging.setEnabled(False)
 
         # Create tag connection
-        self.worker_thread = SerialReader(com_port, baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked))
-        self.worker_thread.tag_data.connect(self.on_tag_data)
-        self.worker_thread.start()
+        com_port = self.findChild(QComboBox, f"comPort_{index}")
+        com_port.setEnabled(False)
+        self.QTHREADS.update({f"serial-{index}": SerialReader(com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked))})
+        self.QTHREADS[f"serial-{index}"].tag_data.connect(self.on_tag_data)
+        self.QTHREADS[f"serial-{index}"].start()
 
-    def stop_serial_connection(self, com_port):
-        self.worker_thread.stop()
-        self.findChild(QPushButton, f"btn_disconnect_{com_port}").setHidden(True)
+    def stop_serial_connection(self, index):
+        if f"serial-{index}" not in self.QTHREADS:
+            return
+        
+        self.QTHREADS[f"serial-{index}"].stop()
+        self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(True)
 
-        self.worker_thread.wait()
-        self.findChild(QPushButton, f"btn_connect_{com_port}").setHidden(False)
-        self.findChild(QLineEdit, f"baudrate_{com_port}").setEnabled(True)
-        self.findChild(QCheckBox, f"chk_logging_{com_port}").setEnabled(True)
+        self.QTHREADS[f"serial-{index}"].wait()
+        self.findChild(QPushButton, f"btn_connect_{index}").setHidden(False)
+        self.findChild(QLineEdit, f"baudrate_{index}").setEnabled(True)
+        self.findChild(QCheckBox, f"chk_logging_{index}").setEnabled(True)
+        self.findChild(QComboBox, f"comPort_{index}").setEnabled(True)
 
     def on_tag_data(self, value: TagData, comPort):
         # Update the GUI Data
@@ -142,7 +175,7 @@ class RtlsUwbApplication(QWidget):
         self.drawAnchors()
 
         for comPort in self.TAGS.keys():
-            self.updateTagLocation(comPort, "blue")
+            self.updateTagLocation(comPort, self.TAG_COLOURS[comPort])
 
         # Redraw Plot
         plt.draw()
@@ -175,7 +208,7 @@ class RtlsUwbApplication(QWidget):
         self.plot.text(x, y, f"({x}, {y})", horizontalalignment="center", verticalalignment="top", fontsize=8, color="gray")
 
     def drawAnchors(self):
-        anchor_list_text = "Anchor List: \n"
+        anchor_list_text = ""
         for a in self.ANCHOR_LOCATIONS:
             self.drawTriangle(a.X, a.Y, 0.1, self.ANCHOR_COLOUR)
             self.plot.text(a.X, a.Y, f"({a.AnchorID})", horizontalalignment="center", verticalalignment="bottom", fontsize=8, color="black")
