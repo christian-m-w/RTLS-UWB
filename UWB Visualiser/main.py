@@ -1,6 +1,6 @@
 import sys, os, time
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from serialReader import SerialReader
 from csvReader import CsvReader
 from tagData import TagData
@@ -17,9 +17,10 @@ class AnchorLocation:
     Z: float
 
 class RtlsUwbApplication(QWidget):
+    REDRAW_TIMER = QTimer()
     ANCHOR_LOCATIONS = set()
     TAGS = {}
-    TAG_DATA: TagData
+    QTHREADS = {} 
 
     # Floor Plan Configuration
     FP_IMAGE_PATH = "./UWB Visualiser/floorplan.png"
@@ -30,6 +31,25 @@ class RtlsUwbApplication(QWidget):
     # Logging Settings
     LOGFILE_DIRECTORY = "."
 
+    # APPLICATION CONFIG
+    PLOT_UPDATE_FREQUENCY_MS = 10
+    ORIGIN_COLOUR = "red"
+    ANCHOR_COLOUR = "red"
+
+    def UpdateQWidgetColour(self, type, name):
+       cmb = self.findChild(type, f"{name}")
+       cmb_text = cmb.currentText()
+       cmb.setStyleSheet(f"QWidget {{background-color: {cmb_text};}}")
+
+    def update_fp(self):
+        x = self.findChild(QLineEdit, f"fpOriginX").text()
+        y = self.findChild(QLineEdit, f"fpOriginY").text()
+        scale = self.findChild(QLineEdit, f"fp10m").text()
+        self.FP_ORIGIN_X_IN_PIXELS = int(x)
+        self.FP_ORIGIN_Y_IN_PIXELS = int(y)
+        self.FP_10M_IN_PIXELS = int(scale)
+        self.redraw_plot()
+
     def drawPlot(self):
         img = plt.imread(self.FP_IMAGE_PATH)
         height, width, channels = img.shape
@@ -38,6 +58,10 @@ class RtlsUwbApplication(QWidget):
         self.plot.imshow(img, extent=(-fp_offset_x, (width * 10) / self.FP_10M_IN_PIXELS, -fp_offset_y, (height * 10) / self.FP_10M_IN_PIXELS), alpha=0.6, zorder=-1)
         self.plot.minorticks_on()
         self.plot.grid(True, "both")
+        self.plot.set_xlabel("X (m)")
+        self.plot.set_ylabel("Y (m)")
+        self.plot.set_box_aspect(1)
+        self.drawSquare(0, 0, 0.1, self.ORIGIN_COLOUR)
 
     def __init__(self):
         super().__init__()
@@ -47,9 +71,6 @@ class RtlsUwbApplication(QWidget):
         # Create figure plot
         fig = plt.figure(figsize=(10,10))
         self.plot = fig.add_subplot()
-        self.plot.set_xlabel("X (m)")
-        self.plot.set_ylabel("Y (m)")
-        self.plot.set_box_aspect(1)
 
         self.drawPlot()
         canvas = FigureCanvasQTAgg(fig)
@@ -60,18 +81,29 @@ class RtlsUwbApplication(QWidget):
         mainLayout.addLayout(controlsLayout)
         self.setLayout(mainLayout)
 
-    def start_csv_replay(self):      
-        # Read CSV Log
-        self.worker_thread = CsvReader(f"{self.LOGFILE_DIRECTORY}/{self.cmb_csv.currentText()}")
-        self.worker_thread.tag_data.connect(self.on_tag_data)
-        self.worker_thread.start()
+    def start_timer(self):
+        if self.REDRAW_TIMER.isActive():
+            return
+        self.REDRAW_TIMER.timeout.connect(self.redraw_plot)
+        self.REDRAW_TIMER.start(self.PLOT_UPDATE_FREQUENCY_MS)
     
-    def stop_csv_replay(self):
-        self.worker_thread.stop()
-        self.worker_thread.wait()
+    def stop_timer(self):
+        self.REDRAW_TIMER.stop()
+
+    def start_csv_replay(self, index):
+        self.start_timer()
+
+        # Read CSV Log
+        fName = self.findChild(QComboBox, f"cmb_csv_{index}").currentText()       
+        self.QTHREADS.update({index: CsvReader(f"{self.LOGFILE_DIRECTORY}/{fName}")})
+        self.QTHREADS[index].tag_data.connect(self.on_tag_data)
+        self.QTHREADS[index].start()
+    
+    def stop_csv_replay(self, index):
+        self.QTHREADS[index].stop()
+        self.QTHREADS[index].wait()
 
     def start_serial_connection(self, com_port):
-        print(f"{com_port} - connecting...")
         self.findChild(QPushButton, f"btn_connect_{com_port}").setHidden(True)
         self.findChild(QPushButton, f"btn_disconnect_{com_port}").setHidden(False)
         baudrate = self.findChild(QLineEdit, f"baudrate_{com_port}")
@@ -85,7 +117,6 @@ class RtlsUwbApplication(QWidget):
         self.worker_thread.start()
 
     def stop_serial_connection(self, com_port):
-        print(f"{com_port} - disconnecting...")
         self.worker_thread.stop()
         self.findChild(QPushButton, f"btn_disconnect_{com_port}").setHidden(True)
 
@@ -96,19 +127,22 @@ class RtlsUwbApplication(QWidget):
 
     def on_tag_data(self, value: TagData, comPort):
         # Update the GUI Data
-        self.TAG_DATA = value
+        self.TAGS[comPort] = value
         self.updateAnchors(value.AnchorPositions)
         self.lbl_tag.setText(f"Tag Position: ({value.TagPosition.X}, {value.TagPosition.Y}, {value.TagPosition.Z})")
         self.lbl_tag_qf.setText(f"Tag Quality Factor: {value.TagPosition.QF}%")
         self.prgbar.setValue(value.TagPosition.QF)
         
+    def redraw_plot(self):
         # Clear Plot
         self.plot.cla()
         self.drawPlot()
     
         # Add plot graphics
         self.drawAnchors()
-        self.updateTagLocation(comPort)
+
+        for comPort in self.TAGS.keys():
+            self.updateTagLocation(comPort, "blue")
 
         # Redraw Plot
         plt.draw()
@@ -120,12 +154,18 @@ class RtlsUwbApplication(QWidget):
 
     def closeEvent(self, event):
         # On window closing, disconnect all the tags
-        self.worker_thread.stop()
-        self.worker_thread.wait()
+        for thread in self.QTHREADS.values():
+            try:
+                thread.stop()
+                thread.wait()
+            except ValueError as e:
+                print(f"Skipping thread due to error: {e}")
+                continue
         app.quit()
 
-    def updateTagLocation(self, comPort):
-        self.drawTag(comPort, self.TAG_DATA.TagPosition.X, self.TAG_DATA.TagPosition.Y, f"TAG-{comPort}", "blue")
+    def updateTagLocation(self, comPort, colour):
+        if comPort in self.TAGS:
+            self.drawTag(comPort, self.TAGS[comPort].TagPosition.X, self.TAGS[comPort].TagPosition.Y, f"TAG-{comPort}", colour)
 
     def drawTag(self, comPort, x, y, name, colour):
         self.drawTagLines(comPort, x, y)
@@ -137,13 +177,13 @@ class RtlsUwbApplication(QWidget):
     def drawAnchors(self):
         anchor_list_text = "Anchor List: \n"
         for a in self.ANCHOR_LOCATIONS:
-            self.drawTriangle(a.X, a.Y, 0.1, "red")
+            self.drawTriangle(a.X, a.Y, 0.1, self.ANCHOR_COLOUR)
             self.plot.text(a.X, a.Y, f"({a.AnchorID})", horizontalalignment="center", verticalalignment="bottom", fontsize=8, color="black")
             anchor_list_text += f"{a.AnchorID} - ({a.X}, {a.Y}, {a.Z})\n"
         self.lbl_anchors.setText(anchor_list_text)
 
     def drawTagLines(self, comPort, x, y):
-        for a in self.TAG_DATA.AnchorPositions:
+        for a in self.TAGS[comPort].AnchorPositions:
             self.plot.plot([a.X, x], [a.Y, y], color="green", linestyle="--", linewidth=1, alpha=0.2)
             self.plot.text((a.X + x) / 2, (a.Y + y) / 2, f"{a.MetersFromTag}", fontsize=8, color="gray")
 
@@ -152,6 +192,11 @@ class RtlsUwbApplication(QWidget):
         triangle = plt.Polygon([[x + size, y - size],[x, y + size],[x - size, y - size]], color=colour)
         self.plot.add_patch(triangle)
 
+    def drawSquare(self, x, y, size, colour: str):
+        offset = size / 2
+        square = plt.Rectangle([x - offset, y - offset], size, size, color=colour)
+        self.plot.add_patch(square)
+        
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = RtlsUwbApplication()

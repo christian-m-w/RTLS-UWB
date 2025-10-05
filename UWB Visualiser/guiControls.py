@@ -1,11 +1,52 @@
 import os
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit, QColorDialog, QGroupBox
+from PyQt6.QtCore import Qt
+from PyQt6 import QtGui
 import serial.tools.list_ports
 from functools import partial
 
 class guiControls():
     def CreateControlsLayout(self):
         controlsLayout = QVBoxLayout()
+
+        # Floor plan configuration
+        fp_groupBox = QGroupBox("Floorplan Configuration")
+        fp_groupBoxLayout = QVBoxLayout()
+        fp_groupBox.setLayout(fp_groupBoxLayout)
+
+        # Floor plan offsets and scaling
+        fpConfigLayout_X = QHBoxLayout()
+        fpOriginX_label = QLabel("X Origin (pixels):")
+        fpConfigLayout_X.addWidget(fpOriginX_label)
+        fpOriginX = QLineEdit(self)
+        fpOriginX.setObjectName("fpOriginX")
+        fpOriginX.setText("39")
+        fpConfigLayout_X.addWidget(fpOriginX)
+        fp_groupBoxLayout.addLayout(fpConfigLayout_X)
+
+        fpConfigLayout_Y = QHBoxLayout()
+        fpOriginY_label = QLabel("Y Origin (pixels):")
+        fpConfigLayout_Y.addWidget(fpOriginY_label)
+        fpOriginY = QLineEdit(self)
+        fpOriginY.setObjectName("fpOriginY")
+        fpOriginY.setText("912")
+        fpConfigLayout_Y.addWidget(fpOriginY)
+        fp_groupBoxLayout.addLayout(fpConfigLayout_Y)
+        
+        fpConfigLayout_10m = QHBoxLayout()
+        fpOrigin10m_label = QLabel("10m (pixels):")
+        fpConfigLayout_10m.addWidget(fpOrigin10m_label)
+        fp10m = QLineEdit(self)
+        fp10m.setObjectName("fp10m")
+        fp10m.setText("960")
+        fpConfigLayout_10m.addWidget(fp10m)
+        fp_groupBoxLayout.addLayout(fpConfigLayout_10m)
+
+        btn_fpUpdate = QPushButton("Update")
+        btn_fpUpdate.clicked.connect(self.update_fp)
+        fp_groupBoxLayout.addWidget(btn_fpUpdate)
+
+        controlsLayout.addWidget(fp_groupBox)
 
         # Add Serial connections
         for port in serial.tools.list_ports.comports():
@@ -41,19 +82,37 @@ class guiControls():
         controlsLayout.addStretch()
 
         # Logging path settings
-        self.cmb_csv = QComboBox(self)
-        for f_name in os.listdir(f"{self.LOGFILE_DIRECTORY}"):
-            if f_name.endswith(".csv"):
-                self.cmb_csv.addItem(f"{f_name}")
-        controlsLayout.addWidget(self.cmb_csv)
+        csv_heading = QLabel("CSV Replay")
+        controlsLayout.addWidget(csv_heading)
+        c_list = ["red", "green","blue", "yellow", "orange", "purple", "cyan", "lime"]
+        
+        for index in range(1, 5):
+            csvReplayLayout = QHBoxLayout()
+            self.cmb_colour = QComboBox(self)
+            for row, colour in enumerate(c_list):
+                self.cmb_colour.addItem(colour)
+                model = self.cmb_colour.model()
+                model.setData(model.index(row, 0), QtGui.QColor(colour), Qt.ItemDataRole.BackgroundRole)
+            self.cmb_colour.currentTextChanged.connect(partial(self.UpdateQWidgetColour, QComboBox, f"cmb_colour_{index}"))
+            csvReplayLayout.addWidget(self.cmb_colour)
+            self.cmb_colour.setObjectName(f"cmb_colour_{index}")
+            self.cmb_colour.setStyleSheet(f"QWidget {{background-color: {c_list[0]};}}")
 
-        self.btn_replay = QPushButton("Replay")
-        self.btn_replay.clicked.connect(self.start_csv_replay)
-        controlsLayout.addWidget(self.btn_replay)
+            self.cmb_csv = QComboBox(self)
+            self.cmb_csv.setObjectName(f"cmb_csv_{index}")
+            for f_name in os.listdir(f"{self.LOGFILE_DIRECTORY}"):
+                if f_name.endswith(".csv"):
+                    self.cmb_csv.addItem(f"{f_name}")
+            csvReplayLayout.addWidget(self.cmb_csv)
 
-        self.btn_stop = QPushButton("Stop")
-        self.btn_stop.clicked.connect(self.stop_csv_replay)
-        controlsLayout.addWidget(self.btn_stop)
+            self.btn_replay = QPushButton("Replay")
+            self.btn_replay.clicked.connect(partial(self.start_csv_replay, index))
+            csvReplayLayout.addWidget(self.btn_replay)
+
+            self.btn_stop = QPushButton("Stop")
+            self.btn_stop.clicked.connect(partial(self.stop_csv_replay, index))
+            csvReplayLayout.addWidget(self.btn_stop)
+            controlsLayout.addLayout(csvReplayLayout)
 
         controlsLayout.addStretch()
 
