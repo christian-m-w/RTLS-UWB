@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit, QColorDialog, QGroupBox, QFileDialog
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit, QGroupBox
 from PyQt6.QtCore import Qt
 from PyQt6 import QtGui
 import serial.tools.list_ports
@@ -117,7 +117,6 @@ class guiControls():
             btn_disconnect.setObjectName(f"btn_disconnect_{index}")
             btn_disconnect.setHidden(True)
             comPortLayout.addWidget(btn_disconnect)
-
             serial_groupBoxLayout.addLayout(comPortLayout)
         
         controlsLayout.addWidget(serial_groupBox)
@@ -164,20 +163,26 @@ class guiControls():
             csvReplayLayout.addWidget(self.btn_stop)
             csvReplayGroupBoxLayout.addLayout(csvReplayLayout)
 
-        controlsLayout.addStretch()
-
         # Other telemetry
+        tag_position_groupBox = QGroupBox("Tag Positions: ")
+        tag_position_groupBoxLayout = QVBoxLayout()
+        tag_position_groupBox.setLayout(tag_position_groupBoxLayout)
+
         for index in range(1, 5):
             tagPosLayout = QHBoxLayout()
-            self.lbl_tag_qf = QLabel("Tag Quality Factor:")
-            tagPosLayout.addWidget(self.lbl_tag_qf)
+            self.lbl_tag = QLabel(f"Tag {index}:")
+            self.lbl_tag.setObjectName(f"lbl_tag_{index}")
+            self.lbl_tag.setMinimumWidth(200)
+            tagPosLayout.addWidget(self.lbl_tag)
+            self.lbl_tagQf = QLabel("Quality Factor: ")
+            tagPosLayout.addWidget(self.lbl_tagQf)
             self.prgbar = QProgressBar()
             self.prgbar.setMaximum(100)
             self.prgbar.setValue(0)
+            self.prgbar.setObjectName(f"prgbar_{index}")
             tagPosLayout.addWidget(self.prgbar)
-            self.lbl_tag = QLabel(f"Tag {index} Position:")
-            tagPosLayout.addWidget(self.lbl_tag)
-            controlsLayout.addLayout(tagPosLayout)
+            tag_position_groupBoxLayout.addLayout(tagPosLayout)
+        controlsLayout.addWidget(tag_position_groupBox)
 
         anchor_groupBox = QGroupBox("Anchor List: ")
         anchor_groupBoxLayout = QVBoxLayout()

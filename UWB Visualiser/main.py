@@ -184,9 +184,6 @@ class RtlsUwbApplication(QWidget):
         # Update the GUI Data
         self.TAGS[comPort] = value
         self.updateAnchors(value.AnchorPositions)
-        self.lbl_tag.setText(f"Tag Position: ({value.TagPosition.X}, {value.TagPosition.Y}, {value.TagPosition.Z})")
-        self.lbl_tag_qf.setText(f"Tag Quality Factor: {value.TagPosition.QF}%")
-        self.prgbar.setValue(value.TagPosition.QF)
         
     def redraw_plot(self):
         # Clear Plot
@@ -220,7 +217,11 @@ class RtlsUwbApplication(QWidget):
 
     def updateTagLocation(self, comPort, colour):
         if comPort in self.TAGS:
-            self.drawTag(comPort, self.TAGS[comPort].TagPosition.X, self.TAGS[comPort].TagPosition.Y, f"TAG-{comPort}", colour)
+            value = self.TAGS[comPort]
+            index = list(self.TAGS.keys()).index(comPort)
+            self.drawTag(comPort, value.TagPosition.X, value.TagPosition.Y, f"TAG-{comPort}", colour)
+            self.findChild(QLabel, f"lbl_tag_{index+1}").setText(f"TAG_{comPort}: ({value.TagPosition.X}, {value.TagPosition.Y}, {value.TagPosition.Z})")
+            self.findChild(QProgressBar, f"prgbar_{index+1}").setValue(value.TagPosition.QF)
 
     def drawTag(self, comPort, x, y, name, colour):
         self.drawTagLines(comPort, x, y)
@@ -231,10 +232,12 @@ class RtlsUwbApplication(QWidget):
 
     def drawAnchors(self):
         anchor_list_text = ""
-        for a in self.ANCHOR_LOCATIONS:
+        for index, a in enumerate(self.ANCHOR_LOCATIONS):
             self.drawTriangle(a.X, a.Y, 0.1, self.ANCHOR_COLOUR)
             self.plot.text(a.X, a.Y, f"({a.AnchorID})", horizontalalignment="center", verticalalignment="bottom", fontsize=8, color="black")
-            anchor_list_text += f"{a.AnchorID} - ({a.X}, {a.Y}, {a.Z})\n"
+            anchor_list_text += f"[{a.AnchorID}]({a.X}, {a.Y}, {a.Z}), "
+            if (index % 4) == 3:
+                anchor_list_text += "\n"
         self.lbl_anchors.setText(anchor_list_text)
 
     def drawTagLines(self, comPort, x, y):
