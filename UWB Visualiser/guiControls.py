@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit, QColorDialog, QGroupBox
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit, QColorDialog, QGroupBox, QFileDialog
 from PyQt6.QtCore import Qt
 from PyQt6 import QtGui
 import serial.tools.list_ports
@@ -18,38 +18,59 @@ class guiControls():
         fp_groupBoxLayout = QVBoxLayout()
         fp_groupBox.setLayout(fp_groupBoxLayout)
 
+        fpLoadConfigLayout = QHBoxLayout()
+        lbl_configFile = QLabel("Config File: ")
+        fpLoadConfigLayout.addWidget(lbl_configFile)
+        fp_groupBoxLayout.addLayout(fpLoadConfigLayout)
+        cmb_configFile = QComboBox()
+        cmb_configFile.setObjectName("cmb_configFile")
+        for f_name in os.listdir(f"{self.CONFIG_DIRECTORY}"):
+            if f_name.endswith(".json"):
+                 cmb_configFile.addItem(f"{f_name}")
+        fpLoadConfigLayout.addWidget(cmb_configFile)
+        btn_loadConfig = QPushButton("Load Config")
+        btn_loadConfig.clicked.connect(self.LoadConfig)
+        fpLoadConfigLayout.addWidget(btn_loadConfig)
+
+        fpFileConfigLayout = QHBoxLayout()
+        lbl_fpfile = QLabel("Floor plan image:")
+        fpFileConfigLayout.addWidget(lbl_fpfile)
+        fp_filePath = QLineEdit()
+        fp_filePath.setObjectName("fp_filePath")
+        fp_filePath.setText(f"{self.FP_IMAGE_PATH}")
+        fpFileConfigLayout.addWidget(fp_filePath)
+        btn_browseFp = QPushButton("Browse")
+        btn_browseFp.clicked.connect(self.OpenFileDialog)
+        fpFileConfigLayout.addWidget(btn_browseFp)
+        fp_groupBoxLayout.addLayout(fpFileConfigLayout)
+
         # Floor plan offsets and scaling
-        fpConfigLayout_X = QHBoxLayout()
+        fpConfigLayout = QHBoxLayout()
         fpOriginX_label = QLabel("X Origin (pixels):")
-        fpConfigLayout_X.addWidget(fpOriginX_label)
+        fpConfigLayout.addWidget(fpOriginX_label)
         fpOriginX = QLineEdit(self)
         fpOriginX.setObjectName("fpOriginX")
-        fpOriginX.setText("39")
-        fpConfigLayout_X.addWidget(fpOriginX)
-        fp_groupBoxLayout.addLayout(fpConfigLayout_X)
+        fpOriginX.setText(f"{self.FP_ORIGIN_X_IN_PIXELS}")
+        fpConfigLayout.addWidget(fpOriginX)
+        fp_groupBoxLayout.addLayout(fpConfigLayout)
 
-        fpConfigLayout_Y = QHBoxLayout()
         fpOriginY_label = QLabel("Y Origin (pixels):")
-        fpConfigLayout_Y.addWidget(fpOriginY_label)
+        fpConfigLayout.addWidget(fpOriginY_label)
         fpOriginY = QLineEdit(self)
         fpOriginY.setObjectName("fpOriginY")
-        fpOriginY.setText("912")
-        fpConfigLayout_Y.addWidget(fpOriginY)
-        fp_groupBoxLayout.addLayout(fpConfigLayout_Y)
-        
-        fpConfigLayout_10m = QHBoxLayout()
+        fpOriginY.setText(f"{self.FP_ORIGIN_Y_IN_PIXELS}")
+        fpConfigLayout.addWidget(fpOriginY)
+
         fpOrigin10m_label = QLabel("10m (pixels):")
-        fpConfigLayout_10m.addWidget(fpOrigin10m_label)
+        fpConfigLayout.addWidget(fpOrigin10m_label)
         fp10m = QLineEdit(self)
         fp10m.setObjectName("fp10m")
-        fp10m.setText("960")
-        fpConfigLayout_10m.addWidget(fp10m)
-        fp_groupBoxLayout.addLayout(fpConfigLayout_10m)
+        fp10m.setText(f"{self.FP_10M_IN_PIXELS}")
+        fpConfigLayout.addWidget(fp10m)
 
         btn_fpUpdate = QPushButton("Update")
         btn_fpUpdate.clicked.connect(self.update_fp)
-        fp_groupBoxLayout.addWidget(btn_fpUpdate)
-
+        fpConfigLayout.addWidget(btn_fpUpdate)
         controlsLayout.addWidget(fp_groupBox)
 
         # Add Serial connections
@@ -59,6 +80,17 @@ class guiControls():
 
         for index in range(1, 5):
             comPortLayout = QHBoxLayout()
+            self.cmb_comport_colour = QComboBox(self)
+            for row, colour in enumerate(self.COLOURS):
+                self.cmb_comport_colour.addItem(colour)
+                model = self.cmb_comport_colour.model()
+                model.setData(model.index(row, 0), QtGui.QColor(colour), Qt.ItemDataRole.BackgroundRole)
+            self.cmb_comport_colour.setCurrentText(self.COLOURS[index-1])
+            self.cmb_comport_colour.currentTextChanged.connect(partial(self.UpdateQWidgetColour, QComboBox, f"cmb_comport_colour_{index}"))
+            comPortLayout.addWidget(self.cmb_comport_colour)
+            self.cmb_comport_colour.setObjectName(f"cmb_comport_colour_{index}")
+            self.cmb_comport_colour.setStyleSheet(f"QWidget {{background-color: {self.COLOURS[index-1]};}}")
+
             comPort = QComboBox(self)
             comPort.setObjectName(f"comPort_{index}")
             for port in serial.tools.list_ports.comports():
@@ -89,11 +121,12 @@ class guiControls():
             serial_groupBoxLayout.addLayout(comPortLayout)
         
         controlsLayout.addWidget(serial_groupBox)
-        controlsLayout.addStretch()
 
         # Logging path settings
-        csv_heading = QLabel("CSV Replay")
-        controlsLayout.addWidget(csv_heading)
+        csvReplayGroupBox = QGroupBox("CSV Replay: ")
+        csvReplayGroupBoxLayout = QVBoxLayout()
+        csvReplayGroupBox.setLayout(csvReplayGroupBoxLayout)
+        controlsLayout.addWidget(csvReplayGroupBox)
        
         for index in range(1, 5):
             csvReplayLayout = QHBoxLayout()
@@ -106,10 +139,11 @@ class guiControls():
                 self.cmb_colour.addItem(colour)
                 model = self.cmb_colour.model()
                 model.setData(model.index(row, 0), QtGui.QColor(colour), Qt.ItemDataRole.BackgroundRole)
+            self.cmb_colour.setCurrentText(self.COLOURS[index-1])
             self.cmb_colour.currentTextChanged.connect(partial(self.UpdateQWidgetColour, QComboBox, f"cmb_colour_{index}"))
             csvReplayLayout.addWidget(self.cmb_colour)
             self.cmb_colour.setObjectName(f"cmb_colour_{index}")
-            self.cmb_colour.setStyleSheet(f"QWidget {{background-color: {self.COLOURS[0]};}}")
+            self.cmb_colour.setStyleSheet(f"QWidget {{background-color: {self.COLOURS[index-1]};}}")
 
             self.cmb_csv = QComboBox(self)
             self.cmb_csv.setObjectName(f"cmb_csv_{index}")
@@ -128,20 +162,22 @@ class guiControls():
             self.btn_stop.setObjectName(f"btn_stop_{index}")
             self.btn_stop.setEnabled(False)
             csvReplayLayout.addWidget(self.btn_stop)
-            controlsLayout.addLayout(csvReplayLayout)
+            csvReplayGroupBoxLayout.addLayout(csvReplayLayout)
 
         controlsLayout.addStretch()
 
         # Other telemetry
-        self.lbl_tag = QLabel("Tag Position:")
-        controlsLayout.addWidget(self.lbl_tag)
-        self.lbl_tag_qf = QLabel("Tag Quality Factor:")
-        controlsLayout.addWidget(self.lbl_tag_qf)
-
-        self.prgbar = QProgressBar()
-        self.prgbar.setMaximum(100)
-        self.prgbar.setValue(0)
-        controlsLayout.addWidget(self.prgbar)
+        for index in range(1, 5):
+            tagPosLayout = QHBoxLayout()
+            self.lbl_tag_qf = QLabel("Tag Quality Factor:")
+            tagPosLayout.addWidget(self.lbl_tag_qf)
+            self.prgbar = QProgressBar()
+            self.prgbar.setMaximum(100)
+            self.prgbar.setValue(0)
+            tagPosLayout.addWidget(self.prgbar)
+            self.lbl_tag = QLabel(f"Tag {index} Position:")
+            tagPosLayout.addWidget(self.lbl_tag)
+            controlsLayout.addLayout(tagPosLayout)
 
         anchor_groupBox = QGroupBox("Anchor List: ")
         anchor_groupBoxLayout = QVBoxLayout()

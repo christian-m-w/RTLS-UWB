@@ -1,5 +1,5 @@
-import sys, os, time
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar
+import sys, os, time, json
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from serialReader import SerialReader
 from csvReader import CsvReader
@@ -33,6 +33,7 @@ class RtlsUwbApplication(QWidget):
     LOGFILE_DIRECTORY = "."
 
     # APPLICATION CONFIG
+    CONFIG_DIRECTORY = "."
     PLOT_UPDATE_FREQUENCY_MS = 10
     ORIGIN_COLOUR = "red"
     ANCHOR_COLOUR = "red"
@@ -40,12 +41,28 @@ class RtlsUwbApplication(QWidget):
 
     def reset_data(self):
         self.stop_timer()
-
         self.ANCHOR_LOCATIONS = set()
         self.TAGS = {}
         self.TAG_COLOURS = {}
         self.QTHREADS = {}
         self.redraw_plot()
+
+    def LoadConfig(self):
+        config_file = self.findChild(QComboBox, f"cmb_configFile").currentText()
+        try:
+            with open(config_file, 'r') as file:
+                data = json.load(file)
+                self.findChild(QLineEdit, f"fp_filePath").setText(data['FP_IMAGE_PATH'])
+                self.findChild(QLineEdit, f"fpOriginX").setText(data['FP_ORIGIN_X_IN_PIXELS'])
+                self.findChild(QLineEdit, f"fpOriginY").setText(data['FP_ORIGIN_Y_IN_PIXELS'])
+                self.findChild(QLineEdit, f"fp10m").setText(data['FP_10M_IN_PIXELS'])
+        except FileNotFoundError:
+            print("File not found")
+    
+    def OpenFileDialog(self):
+        fName, _ = QFileDialog.getOpenFileName(window, "Select File", "", "All Files (*)")
+        if fName:
+            self.findChild(QLineEdit, f"fp_filePath").setText(fName)
 
     def UpdateQWidgetColour(self, type, name):
        cmb = self.findChild(type, f"{name}")
@@ -53,9 +70,11 @@ class RtlsUwbApplication(QWidget):
        cmb.setStyleSheet(f"QWidget {{background-color: {cmb_text};}}")
 
     def update_fp(self):
+        fp_file = self.findChild(QLineEdit, f"fp_filePath").text()
         x = self.findChild(QLineEdit, f"fpOriginX").text()
         y = self.findChild(QLineEdit, f"fpOriginY").text()
         scale = self.findChild(QLineEdit, f"fp10m").text()
+        self.FP_IMAGE_PATH = fp_file
         self.FP_ORIGIN_X_IN_PIXELS = int(x)
         self.FP_ORIGIN_Y_IN_PIXELS = int(y)
         self.FP_10M_IN_PIXELS = int(scale)
@@ -130,7 +149,6 @@ class RtlsUwbApplication(QWidget):
 
     def start_serial_connection(self, index):
         self.start_timer()
-
         self.findChild(QPushButton, f"btn_connect_{index}").setHidden(True)
         self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(False)
         baudrate = self.findChild(QLineEdit, f"baudrate_{index}")
@@ -141,6 +159,10 @@ class RtlsUwbApplication(QWidget):
         # Create tag connection
         com_port = self.findChild(QComboBox, f"comPort_{index}")
         com_port.setEnabled(False)
+
+        tagColour = self.findChild(QComboBox, f"cmb_comport_colour_{index}").currentText()
+        self.TAG_COLOURS.update({f"{com_port.currentText()}": tagColour})
+
         self.QTHREADS.update({f"serial-{index}": SerialReader(com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked))})
         self.QTHREADS[f"serial-{index}"].tag_data.connect(self.on_tag_data)
         self.QTHREADS[f"serial-{index}"].start()
