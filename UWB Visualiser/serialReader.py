@@ -23,7 +23,7 @@ class SerialReader(QThread):
 
         # Activate the location data logging with two enters and the lec command
         tag.write(b'\r')
-        time.sleep(0.1)
+        time.sleep(0.5)
         tag.write(b'\r')
         time.sleep(0.5)
         tag.write(b'lec\r')
