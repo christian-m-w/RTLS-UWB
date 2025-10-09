@@ -30,7 +30,7 @@ class TagDataUtils():
         t.AnchorPositions.append(AnchorPosition(row[7], float(row[8]), float(row[9]), float(row[10]), float(row[11])))
         t.AnchorPositions.append(AnchorPosition(row[12], float(row[13]), float(row[14]), float(row[15]), float(row[16])))
 
-        # POS,1.83,3.33,2.16,47
+        # 1.83,3.33,2.16,47
         if row[1] == "4": # Check number of anchors in position calculation (3 or 4)
             t.AnchorPositions.append(AnchorPosition(row[17], float(row[18]), float(row[19]), float(row[20]), float(row[21])))
             t.TagPosition = TagPosition(float(row[22]), float(row[23]), float(row[24]), int(row[25]))

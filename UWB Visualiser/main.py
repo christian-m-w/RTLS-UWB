@@ -40,6 +40,7 @@ class RtlsUwbApplication(QWidget):
     COLOURS = ["lime", "cyan", "yellow", "orange", "mediumpurple","dodgerblue","tomato"]
 
     def reset_data(self):
+        # Stop the visualisation and clear the tag/anchor data
         self.stop_timer()
         self.ANCHOR_LOCATIONS = set()
         self.TAGS = {}
@@ -65,19 +66,16 @@ class RtlsUwbApplication(QWidget):
             self.findChild(QLineEdit, f"fp_filePath").setText(fName)
 
     def UpdateQWidgetColour(self, type, name):
-       cmb = self.findChild(type, f"{name}")
-       cmb_text = cmb.currentText()
-       cmb.setStyleSheet(f"QWidget {{background-color: {cmb_text};}}")
+        cmb = self.findChild(type, f"{name}")
+        cmb_text = cmb.currentText()
+        cmb.setStyleSheet(f"QWidget {{background-color: {cmb_text};}}")
 
     def update_fp(self):
-        fp_file = self.findChild(QLineEdit, f"fp_filePath").text()
-        x = self.findChild(QLineEdit, f"fpOriginX").text()
-        y = self.findChild(QLineEdit, f"fpOriginY").text()
-        scale = self.findChild(QLineEdit, f"fp10m").text()
-        self.FP_IMAGE_PATH = fp_file
-        self.FP_ORIGIN_X_IN_PIXELS = int(x)
-        self.FP_ORIGIN_Y_IN_PIXELS = int(y)
-        self.FP_10M_IN_PIXELS = int(scale)
+        # Read floor plan configuration from GUI 
+        self.FP_IMAGE_PATH = self.findChild(QLineEdit, f"fp_filePath").text()
+        self.FP_ORIGIN_X_IN_PIXELS = int(self.findChild(QLineEdit, f"fpOriginX").text())
+        self.FP_ORIGIN_Y_IN_PIXELS = int(self.findChild(QLineEdit, f"fpOriginY").text())
+        self.FP_10M_IN_PIXELS = int(self.findChild(QLineEdit, f"fp10m").text())
         self.redraw_plot()
 
     def drawPlot(self):
@@ -133,7 +131,6 @@ class RtlsUwbApplication(QWidget):
         self.findChild(QLabel, f"lbl_comPort_{index}").setText(f"COM{comPort}")
         tagColour = self.findChild(QComboBox, f"cmb_colour_{index}").currentText()
         self.TAG_COLOURS.update({f"COM{comPort}": tagColour})
-
         self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(False)
         self.findChild(QPushButton, f"btn_stop_{index}").setEnabled(True)
     
@@ -173,7 +170,6 @@ class RtlsUwbApplication(QWidget):
         
         self.QTHREADS[f"serial-{index}"].stop()
         self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(True)
-
         self.QTHREADS[f"serial-{index}"].wait()
         self.findChild(QPushButton, f"btn_connect_{index}").setHidden(False)
         self.findChild(QLineEdit, f"baudrate_{index}").setEnabled(True)
@@ -192,7 +188,6 @@ class RtlsUwbApplication(QWidget):
     
         # Add plot graphics
         self.drawAnchors()
-
         for comPort in self.TAGS.keys():
             self.updateTagLocation(comPort, self.TAG_COLOURS[comPort])
 
@@ -231,14 +226,17 @@ class RtlsUwbApplication(QWidget):
         self.plot.text(x, y, f"({x}, {y})", horizontalalignment="center", verticalalignment="top", fontsize=8, color="gray")
 
     def drawAnchors(self):
-        anchor_list_text = ""
-        for index, a in enumerate(self.ANCHOR_LOCATIONS):
+        anchor_list_text = []
+        numPerColumn = 3
+        for a in self.ANCHOR_LOCATIONS:
             self.drawTriangle(a.X, a.Y, 0.1, self.ANCHOR_COLOUR)
             self.plot.text(a.X, a.Y, f"({a.AnchorID})", horizontalalignment="center", verticalalignment="bottom", fontsize=8, color="black")
-            anchor_list_text += f"[{a.AnchorID}]({a.X}, {a.Y}, {a.Z}), "
-            if (index % 4) == 3:
-                anchor_list_text += "\n"
-        self.lbl_anchors.setText(anchor_list_text)
+            anchor_list_text.append(f"[{a.AnchorID}]({a.X}, {a.Y}, {a.Z})\n")
+        self.lbl_anchors_col1.setText(''.join(anchor_list_text[:numPerColumn]))
+        self.lbl_anchors_col2.setText(''.join(anchor_list_text[numPerColumn:numPerColumn*2]))
+        self.lbl_anchors_col3.setText(''.join(anchor_list_text[numPerColumn*2:numPerColumn*3]))
+        self.lbl_anchors_col4.setText(''.join(anchor_list_text[numPerColumn*3:]))
+
 
     def drawTagLines(self, comPort, x, y):
         for a in self.TAGS[comPort].AnchorPositions:
