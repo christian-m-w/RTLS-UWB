@@ -1,5 +1,5 @@
-import sys, os, time, json
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QFileDialog
+import sys, json
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from serialReader import SerialReader
 from csvReader import CsvReader
@@ -24,16 +24,14 @@ class RtlsUwbApplication(QWidget):
     QTHREADS = {} 
 
     # Floor Plan Configuration
-    FP_IMAGE_PATH = "./UWB Visualiser/floorplan.png"
-    FP_ORIGIN_X_IN_PIXELS = 39
-    FP_ORIGIN_Y_IN_PIXELS = 912
-    FP_10M_IN_PIXELS = 960
+    FP_IMAGE_PATH = "./floorplans/default-floorplan.png"
+    FP_ORIGIN_X_IN_PIXELS = 10
+    FP_ORIGIN_Y_IN_PIXELS = 310
+    FP_10M_IN_PIXELS = 1000
     
-    # Logging Settings
-    LOGFILE_DIRECTORY = "."
-
     # APPLICATION CONFIG
-    CONFIG_DIRECTORY = "."
+    LOGFILE_DIRECTORY = "./logs"
+    CONFIG_DIRECTORY = "./configurations"
     PLOT_UPDATE_FREQUENCY_MS = 10
     ORIGIN_COLOUR = "red"
     ANCHOR_COLOUR = "red"
@@ -51,7 +49,7 @@ class RtlsUwbApplication(QWidget):
     def LoadConfig(self):
         config_file = self.findChild(QComboBox, f"cmb_configFile").currentText()
         try:
-            with open(config_file, 'r') as file:
+            with open(f"{self.CONFIG_DIRECTORY}/{config_file}", 'r') as file:
                 data = json.load(file)
                 self.findChild(QLineEdit, f"fp_filePath").setText(data['FP_IMAGE_PATH'])
                 self.findChild(QLineEdit, f"fpOriginX").setText(data['FP_ORIGIN_X_IN_PIXELS'])
@@ -83,7 +81,7 @@ class RtlsUwbApplication(QWidget):
         height, width, channels = img.shape
         fp_offset_x = (self.FP_ORIGIN_X_IN_PIXELS * 10) / self.FP_10M_IN_PIXELS
         fp_offset_y = ((height-self.FP_ORIGIN_Y_IN_PIXELS) * 10) / self.FP_10M_IN_PIXELS
-        self.plot.imshow(img, extent=(-fp_offset_x, (width * 10) / self.FP_10M_IN_PIXELS, -fp_offset_y, (height * 10) / self.FP_10M_IN_PIXELS), alpha=0.6, zorder=-1)
+        self.plot.imshow(img, extent=(-fp_offset_x, ((width * 10) / self.FP_10M_IN_PIXELS)-fp_offset_x, -fp_offset_y, ((height * 10) / self.FP_10M_IN_PIXELS)-fp_offset_y), alpha=0.6, zorder=-1)
         self.plot.minorticks_on()
         self.plot.grid(True, "both")
         self.plot.set_xlabel("X (m)")

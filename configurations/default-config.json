@@ -1,0 +1,6 @@
+{
+"FP_IMAGE_PATH": "./floorplans/default-floorplan.png",
+"FP_ORIGIN_X_IN_PIXELS": "10",
+"FP_ORIGIN_Y_IN_PIXELS": "310",
+"FP_10M_IN_PIXELS": "1000"
+}
