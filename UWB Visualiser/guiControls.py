@@ -78,6 +78,10 @@ class guiControls():
         serial_groupBoxLayout = QVBoxLayout()
         serial_groupBox.setLayout(serial_groupBoxLayout)
 
+        btn_searchComPorts = QPushButton("Search COM Ports")
+        btn_searchComPorts.clicked.connect(self.search_com_ports)
+        serial_groupBoxLayout.addWidget(btn_searchComPorts)
+
         for index in range(1, 5):
             comPortLayout = QHBoxLayout()
             self.cmb_comport_colour = QComboBox(self)

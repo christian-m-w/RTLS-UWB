@@ -2,6 +2,7 @@ import sys, json
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from serialReader import SerialReader
+import serial.tools.list_ports
 from csvReader import CsvReader
 from tagData import TagData
 from dataclasses import dataclass
@@ -46,6 +47,14 @@ class RtlsUwbApplication(QWidget):
         self.QTHREADS = {}
         self.redraw_plot()
 
+    def search_com_ports(self):
+        # Update the serial COM port dropdowns
+        for index in range(1, 5):
+            comPort = self.findChild(QComboBox, f"comPort_{index}")
+            comPort.clear() # Removes all the items in the combobox
+            for port in serial.tools.list_ports.comports():
+                comPort.addItem(f"{port.name}")
+    
     def LoadConfig(self):
         config_file = self.findChild(QComboBox, f"cmb_configFile").currentText()
         try:
