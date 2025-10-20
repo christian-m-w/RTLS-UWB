@@ -2,6 +2,7 @@ import sys, json
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from serialReader import SerialReader
+from PyQt6.QtCore import QThread
 import serial.tools.list_ports
 from csvReader import CsvReader
 from tagData import TagData
@@ -46,6 +47,21 @@ class RtlsUwbApplication(QWidget):
         self.TAG_COLOURS = {}
         self.QTHREADS = {}
         self.redraw_plot()
+
+        for index in range(1, 5):
+            self.findChild(QLabel, f"lbl_tag_{index}").setText(f"Tag {index}:")
+            self.findChild(QProgressBar, f"prgbar_{index}").setValue(0)
+
+    def enable_reset_btn(self):
+        self.enableReset = True
+        # Checks serial or csv communication has stopped before enabling a reset
+        for thread in self.QTHREADS.values():
+            if thread.isRunning():
+                self.enableReset = False
+                break
+
+        if self.enableReset:
+            self.findChild(QPushButton, f"btn_reset").setEnabled(True)
 
     def search_com_ports(self):
         # Update the serial COM port dropdowns
@@ -140,6 +156,7 @@ class RtlsUwbApplication(QWidget):
         self.TAG_COLOURS.update({f"COM{comPort}": tagColour})
         self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(False)
         self.findChild(QPushButton, f"btn_stop_{index}").setEnabled(True)
+        self.findChild(QPushButton, f"btn_reset").setEnabled(False)
     
     def stop_csv_replay(self, index):
         self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(True)
@@ -151,8 +168,11 @@ class RtlsUwbApplication(QWidget):
         self.QTHREADS[f"csv-{index}"].stop()
         self.QTHREADS[f"csv-{index}"].wait()
 
+        self.enable_reset_btn()
+
     def start_serial_connection(self, index):
         self.start_timer()
+        self.findChild(QPushButton, f"btn_reset").setEnabled(False)
         self.findChild(QPushButton, f"btn_connect_{index}").setHidden(True)
         self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(False)
         baudrate = self.findChild(QLineEdit, f"baudrate_{index}")
@@ -182,6 +202,7 @@ class RtlsUwbApplication(QWidget):
         self.findChild(QLineEdit, f"baudrate_{index}").setEnabled(True)
         self.findChild(QCheckBox, f"chk_logging_{index}").setEnabled(True)
         self.findChild(QComboBox, f"comPort_{index}").setEnabled(True)
+        self.enable_reset_btn()
 
     def on_tag_data(self, value: TagData, comPort):
         # Update the GUI Data

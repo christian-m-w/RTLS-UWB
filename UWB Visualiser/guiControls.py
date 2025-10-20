@@ -10,6 +10,7 @@ class guiControls():
         controlsLayout = QVBoxLayout()
 
         btn_reset = QPushButton("Reset")
+        btn_reset.setObjectName("btn_reset")
         btn_reset.clicked.connect(self.reset_data)
         controlsLayout.addWidget(btn_reset)
 
