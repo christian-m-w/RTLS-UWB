@@ -228,11 +228,11 @@ class RtlsUwbApplication(QWidget):
             self.ANCHOR_LOCATIONS.add(AnchorLocation(a.AnchorID, a.X, a.Y, a.Z))
 
     def closeEvent(self, event):
-        # On window closing, disconnect all the tags
+        # On window closing, disconnect all the tags (Closes all the COM ports and threads in use)
         for thread in self.QTHREADS.values():
             try:
-                thread.stop()
-                thread.wait()
+                thread.stop() # Signal the QThread to stop reading serial data and close the COM port
+                thread.wait() # Allow the thread to finish before exiting
             except ValueError as e:
                 print(f"Skipping thread due to error: {e}")
                 continue

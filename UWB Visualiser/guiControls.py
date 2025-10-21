@@ -8,11 +8,16 @@ from functools import partial
 class guiControls():
     def CreateControlsLayout(self):
         controlsLayout = QVBoxLayout()
-
+        resetCloseLayout = QHBoxLayout()
         btn_reset = QPushButton("Reset")
         btn_reset.setObjectName("btn_reset")
         btn_reset.clicked.connect(self.reset_data)
-        controlsLayout.addWidget(btn_reset)
+        resetCloseLayout.addWidget(btn_reset)
+
+        btn_close = QPushButton("Quit")
+        btn_close.clicked.connect(self.close)
+        resetCloseLayout.addWidget(btn_close)
+        controlsLayout.addLayout(resetCloseLayout)
 
         # Floor plan configuration
         fp_groupBox = QGroupBox("Floorplan Configuration: ")
