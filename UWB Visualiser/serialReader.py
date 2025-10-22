@@ -1,4 +1,4 @@
-import serial, os
+import serial
 import time
 from datetime import datetime, timezone
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -8,11 +8,12 @@ from utils.tagDataUtils import TagDataUtils
 class SerialReader(QThread):
     tag_data = pyqtSignal(TagData, str)
 
-    def __init__(self, PORT, BAUDRATE, ENABLE_LOGGING):
+    def __init__(self, PORT, BAUDRATE, ENABLE_LOGGING, LOGFILE_DIRECTORY):
         super().__init__()
         self.PORT = PORT
         self.BAUDRATE = BAUDRATE
         self.ENABLE_LOGGING = ENABLE_LOGGING
+        self.LOGFILE_DIRECTORY = LOGFILE_DIRECTORY
 
     def run(self):
         # Create listener on serial COM port
@@ -35,8 +36,7 @@ class SerialReader(QThread):
         # log data to CSV - Filename format (YYYY-MM-DD-HH-MM-SS-ComPort.csv)
         if self.ENABLE_LOGGING:
             now = datetime.now(timezone.utc)
-            cwd = os.getcwd()
-            f = open(f"{cwd}\\{now.strftime("%Y-%m-%d-%H-%M-%S")}-{self.PORT[3]}.csv", "a")
+            f = open(f"{self.LOGFILE_DIRECTORY}\\{now.strftime("%Y-%m-%d-%H-%M-%S")}-{self.PORT[3]}.csv", "a")
 
         print(f"Running... {self.PORT} - {self.BAUDRATE} - {self.ENABLE_LOGGING}")
 

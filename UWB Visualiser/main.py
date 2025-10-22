@@ -1,8 +1,7 @@
-import sys, json
+import sys, json, os
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from serialReader import SerialReader
-from PyQt6.QtCore import QThread
 import serial.tools.list_ports
 from csvReader import CsvReader
 from tagData import TagData
@@ -23,17 +22,23 @@ class RtlsUwbApplication(QWidget):
     ANCHOR_LOCATIONS = set()
     TAGS = {}
     TAG_COLOURS = {}
-    QTHREADS = {} 
+    QTHREADS = {}
+
+    # Update the directory prefix to add the correct relative path, so if the script
+    #   is run from a different working directory the paths to the logs, configurations and floorplans are correct.
+    APPLICATION_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    WORKING_DIR = os.getcwd()
+    DIR_PREFIX = os.path.relpath(APPLICATION_ROOT_DIR, WORKING_DIR)
 
     # Floor Plan Configuration
-    FP_IMAGE_PATH = "./floorplans/default-floorplan.png"
+    FP_IMAGE_PATH = DIR_PREFIX + "/floorplans/default-floorplan.png"
     FP_ORIGIN_X_IN_PIXELS = 10
     FP_ORIGIN_Y_IN_PIXELS = 310
     FP_10M_IN_PIXELS = 1000
     
     # APPLICATION CONFIG
-    LOGFILE_DIRECTORY = "./logs"
-    CONFIG_DIRECTORY = "./configurations"
+    LOGFILE_DIRECTORY = DIR_PREFIX + "/logs"
+    CONFIG_DIRECTORY = DIR_PREFIX + "/configurations"
     PLOT_UPDATE_FREQUENCY_MS = 10
     ORIGIN_COLOUR = "red"
     ANCHOR_COLOUR = "red"
@@ -99,6 +104,11 @@ class RtlsUwbApplication(QWidget):
         self.FP_ORIGIN_X_IN_PIXELS = int(self.findChild(QLineEdit, f"fpOriginX").text())
         self.FP_ORIGIN_Y_IN_PIXELS = int(self.findChild(QLineEdit, f"fpOriginY").text())
         self.FP_10M_IN_PIXELS = int(self.findChild(QLineEdit, f"fp10m").text())
+
+        # If the floorplan path is relative, use the application root as the basepath
+        if not os.path.isabs(self.FP_IMAGE_PATH):
+            self.FP_IMAGE_PATH = os.path.join(self.APPLICATION_ROOT_DIR, self.FP_IMAGE_PATH)
+
         self.redraw_plot()
 
     def drawPlot(self):
@@ -187,7 +197,7 @@ class RtlsUwbApplication(QWidget):
         tagColour = self.findChild(QComboBox, f"cmb_comport_colour_{index}").currentText()
         self.TAG_COLOURS.update({f"{com_port.currentText()}": tagColour})
 
-        self.QTHREADS.update({f"serial-{index}": SerialReader(com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked))})
+        self.QTHREADS.update({f"serial-{index}": SerialReader(com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked), self.LOGFILE_DIRECTORY)})
         self.QTHREADS[f"serial-{index}"].tag_data.connect(self.on_tag_data)
         self.QTHREADS[f"serial-{index}"].start()
 
