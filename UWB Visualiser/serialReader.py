@@ -7,9 +7,11 @@ from utils.tagDataUtils import TagDataUtils
 
 class SerialReader(QThread):
     tag_data = pyqtSignal(TagData, str)
+    serial_connected = pyqtSignal(int)
 
-    def __init__(self, PORT, BAUDRATE, ENABLE_LOGGING, LOGFILE_DIRECTORY):
+    def __init__(self, INDEX, PORT, BAUDRATE, ENABLE_LOGGING, LOGFILE_DIRECTORY):
         super().__init__()
+        self.INDEX = INDEX
         self.PORT = PORT
         self.BAUDRATE = BAUDRATE
         self.ENABLE_LOGGING = ENABLE_LOGGING
@@ -39,6 +41,9 @@ class SerialReader(QThread):
             f = open(f"{self.LOGFILE_DIRECTORY}\\{now.strftime("%Y-%m-%d-%H-%M-%S")}-{self.PORT[3]}.csv", "a")
 
         print(f"Running... {self.PORT} - {self.BAUDRATE} - {self.ENABLE_LOGGING}")
+
+        # Send a signal to GUI indicating the COM Port connected
+        self.serial_connected.emit(self.INDEX)
 
         self.start_time = time.time()
         try:

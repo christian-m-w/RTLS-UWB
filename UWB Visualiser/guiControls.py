@@ -2,7 +2,6 @@ import os
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QCheckBox, QProgressBar, QLineEdit, QGroupBox
 from PyQt6.QtCore import Qt
 from PyQt6 import QtGui
-import serial.tools.list_ports
 from functools import partial
 
 class guiControls():
@@ -103,8 +102,6 @@ class guiControls():
 
             comPort = QComboBox(self)
             comPort.setObjectName(f"comPort_{index}")
-            for port in serial.tools.list_ports.comports():
-                comPort.addItem(f"{port.name}")
             comPortLayout.addWidget(comPort)
 
             baudrate = QLineEdit(self)
@@ -156,9 +153,6 @@ class guiControls():
 
             self.cmb_csv = QComboBox(self)
             self.cmb_csv.setObjectName(f"cmb_csv_{index}")
-            for f_name in os.listdir(f"{self.LOGFILE_DIRECTORY}"):
-                if f_name.endswith(".csv"):
-                    self.cmb_csv.addItem(f"{f_name}")
             csvReplayLayout.addWidget(self.cmb_csv)
 
             self.btn_replay = QPushButton("Replay")

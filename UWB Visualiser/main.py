@@ -75,6 +75,14 @@ class RtlsUwbApplication(QWidget):
             comPort.clear() # Removes all the items in the combobox
             for port in serial.tools.list_ports.comports():
                 comPort.addItem(f"{port.name}")
+
+    def UpdateLogfileDropdownSelection(self):
+        logfiles = [f for f in os.listdir(f"{self.LOGFILE_DIRECTORY}") if f.endswith(".csv")]
+        logfiles.sort(reverse=True)
+        for index in range(1, 5):
+            cmb = self.findChild(QComboBox, f"cmb_csv_{index}")
+            cmb.clear()
+            cmb.addItems(logfiles)
     
     def LoadConfig(self):
         config_file = self.findChild(QComboBox, f"cmb_configFile").currentText()
@@ -142,6 +150,10 @@ class RtlsUwbApplication(QWidget):
         mainLayout.addLayout(controlsLayout)
         self.setLayout(mainLayout)
 
+        # Update the GUI dropdown selection values
+        self.search_com_ports() # Scans for available COM Ports
+        self.UpdateLogfileDropdownSelection() # Scans the logfile directory
+
     def start_timer(self):
         if self.REDRAW_TIMER.isActive():
             return
@@ -184,6 +196,7 @@ class RtlsUwbApplication(QWidget):
         self.start_timer()
         self.findChild(QPushButton, f"btn_reset").setEnabled(False)
         self.findChild(QPushButton, f"btn_connect_{index}").setHidden(True)
+        self.findChild(QPushButton, f"btn_disconnect_{index}").setEnabled(False)
         self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(False)
         baudrate = self.findChild(QLineEdit, f"baudrate_{index}")
         baudrate.setEnabled(False)
@@ -197,10 +210,11 @@ class RtlsUwbApplication(QWidget):
         tagColour = self.findChild(QComboBox, f"cmb_comport_colour_{index}").currentText()
         self.TAG_COLOURS.update({f"{com_port.currentText()}": tagColour})
 
-        self.QTHREADS.update({f"serial-{index}": SerialReader(com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked), self.LOGFILE_DIRECTORY)})
+        self.QTHREADS.update({f"serial-{index}": SerialReader(index, com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked), self.LOGFILE_DIRECTORY)})
         self.QTHREADS[f"serial-{index}"].tag_data.connect(self.on_tag_data)
+        self.QTHREADS[f"serial-{index}"].serial_connected.connect(self.on_serial_connected)
         self.QTHREADS[f"serial-{index}"].start()
-
+        
     def stop_serial_connection(self, index):
         if f"serial-{index}" not in self.QTHREADS:
             return
@@ -214,10 +228,18 @@ class RtlsUwbApplication(QWidget):
         self.findChild(QComboBox, f"comPort_{index}").setEnabled(True)
         self.enable_reset_btn()
 
+        # If logging was enabled, update CSV logfile dropdown selection
+        if self.findChild(QCheckBox, f"chk_logging_{index}").isChecked():
+            self.UpdateLogfileDropdownSelection()
+
     def on_tag_data(self, value: TagData, comPort):
         # Update the GUI Data
         self.TAGS[comPort] = value
         self.updateAnchors(value.AnchorPositions)
+
+    def on_serial_connected(self, index):
+        # Enable the disconnect button when serial is connected
+        self.findChild(QPushButton, f"btn_disconnect_{index}").setEnabled(True)
         
     def redraw_plot(self):
         # Clear Plot
@@ -274,7 +296,6 @@ class RtlsUwbApplication(QWidget):
         self.lbl_anchors_col2.setText(''.join(anchor_list_text[numPerColumn:numPerColumn*2]))
         self.lbl_anchors_col3.setText(''.join(anchor_list_text[numPerColumn*2:numPerColumn*3]))
         self.lbl_anchors_col4.setText(''.join(anchor_list_text[numPerColumn*3:]))
-
 
     def drawTagLines(self, comPort, x, y):
         for a in self.TAGS[comPort].AnchorPositions:
