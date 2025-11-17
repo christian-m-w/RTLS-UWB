@@ -37,7 +37,7 @@ class SerialReader(QThread):
         
         # log data to CSV - Filename format (YYYY-MM-DD-HH-MM-SS-ComPort.csv)
         if self.ENABLE_LOGGING:
-            now = datetime.now(timezone.utc)
+            now = datetime.now()
             f = open(f"{self.LOGFILE_DIRECTORY}\\{now.strftime("%Y-%m-%d-%H-%M-%S")}-{self.PORT[3:]}.csv", "a")
 
         print(f"Running... {self.PORT} - {self.BAUDRATE} - {self.ENABLE_LOGGING}")
