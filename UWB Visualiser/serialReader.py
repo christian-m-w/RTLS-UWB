@@ -1,13 +1,15 @@
 import serial
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from PyQt6.QtCore import QThread, pyqtSignal
 from tagData import TagData
 from utils.tagDataUtils import TagDataUtils
+from serial.serialutil import SerialException
 
 class SerialReader(QThread):
     tag_data = pyqtSignal(TagData, str)
     serial_connected = pyqtSignal(int)
+    serial_disconnected = pyqtSignal(int)
 
     def __init__(self, INDEX, PORT, BAUDRATE, ENABLE_LOGGING, LOGFILE_DIRECTORY):
         super().__init__()
@@ -18,23 +20,32 @@ class SerialReader(QThread):
         self.LOGFILE_DIRECTORY = LOGFILE_DIRECTORY
 
     def run(self):
-        # Create listener on serial COM port
-        tag = serial.Serial(self.PORT, self.BAUDRATE, timeout=1)
+        try:
+            # Create listener on serial COM port
+            tag = serial.Serial(self.PORT, self.BAUDRATE, timeout=1)
+        except SerialException as e:
+            # Catch any serial errors opening port
+            print(f"Serial Exeption: {e}")
+            self.serial_disconnected.emit(self.INDEX)
+            return
 
         # Wait for the device to connect
         time.sleep(2)
 
-        # Activate the location data logging with two enters and the lec command
-        tag.write(b'\r')
-        time.sleep(0.5)
-        tag.write(b'\r')
-        time.sleep(0.5)
-        tag.write(b'lec\r')
-        time.sleep(0.1)
+        # Check if the device is already sending location data
+        line = tag.readline().decode(errors='ignore').strip()
+        if not line or line.startswith("DIST") == False or "POS" not in line:
+            # Activate the location data logging with two enters and the lec command
+            tag.write(b'\r')
+            time.sleep(0.5)
+            tag.write(b'\r')
+            time.sleep(0.5)
+            tag.write(b'lec\r')
+            time.sleep(0.1)
 
         # Read the logging data and emit it or save to CSV
         self.running = True
-        
+ 
         # log data to CSV - Filename format (YYYY-MM-DD-HH-MM-SS-ComPort.csv)
         if self.ENABLE_LOGGING:
             now = datetime.now()
@@ -68,9 +79,21 @@ class SerialReader(QThread):
 
                 # Send the tag data signal
                 self.send_tag_data(tagData, self.PORT)
+        except SerialException as e:
+            print(f"Serial Exeption: {e}")
         finally:
-            tag.close()
-            print(f"Closing serial connection on {self.PORT}...")
+            try:
+                # Send the command to stop the location data and reboot the device
+                tag.write(b'lec\r')
+                time.sleep(0.1)
+                tag.write(b'reset\r')
+                time.sleep(0.1)
+            except SerialException as e:
+                print(f"Serial Exeption: {e}")
+            finally:
+                tag.close()
+                print(f"Closing serial connection on {self.PORT}...")
+                self.serial_disconnected.emit(self.INDEX)
 
     def stop(self):
         self.running = False

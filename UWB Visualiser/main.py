@@ -168,19 +168,24 @@ class RtlsUwbApplication(QWidget):
 
         # Read CSV Log
         fName = self.findChild(QComboBox, f"cmb_csv_{index}").currentText()       
-        self.QTHREADS.update({f"csv-{index}": CsvReader(f"{self.LOGFILE_DIRECTORY}/{fName}")})
+        self.QTHREADS.update({f"csv-{index}": CsvReader(index, f"{self.LOGFILE_DIRECTORY}/{fName}")})
         self.QTHREADS[f"csv-{index}"].tag_data.connect(self.on_tag_data)
+        self.QTHREADS[f"csv-{index}"].replay_stopped.connect(self.stop_csv_replay)
         self.QTHREADS[f"csv-{index}"].start()
 
         comPort = fName[fName.rfind('-')+1:-4]
         self.findChild(QLabel, f"lbl_comPort_{index}").setText(f"COM{comPort}")
         tagColour = self.findChild(QComboBox, f"cmb_colour_{index}").currentText()
         self.TAG_COLOURS.update({f"COM{comPort}": tagColour})
+        self.findChild(QComboBox, f"cmb_colour_{index}").setEnabled(False)
+        self.findChild(QComboBox, f"cmb_csv_{index}").setEnabled(False)
         self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(False)
         self.findChild(QPushButton, f"btn_stop_{index}").setEnabled(True)
         self.findChild(QPushButton, f"btn_reset").setEnabled(False)
     
     def stop_csv_replay(self, index):
+        self.findChild(QComboBox, f"cmb_colour_{index}").setEnabled(True)
+        self.findChild(QComboBox, f"cmb_csv_{index}").setEnabled(True)
         self.findChild(QPushButton, f"btn_replay_{index}").setEnabled(True)
         self.findChild(QPushButton, f"btn_stop_{index}").setEnabled(False)
     
@@ -194,6 +199,7 @@ class RtlsUwbApplication(QWidget):
 
     def start_serial_connection(self, index):
         self.start_timer()
+        self.findChild(QComboBox, f"cmb_comport_colour_{index}").setEnabled(False)
         self.findChild(QPushButton, f"btn_reset").setEnabled(False)
         self.findChild(QPushButton, f"btn_connect_{index}").setHidden(True)
         self.findChild(QPushButton, f"btn_disconnect_{index}").setEnabled(False)
@@ -213,6 +219,7 @@ class RtlsUwbApplication(QWidget):
         self.QTHREADS.update({f"serial-{index}": SerialReader(index, com_port.currentText(), baudrate.text(), (chk_logging.checkState() == Qt.CheckState.Checked), self.LOGFILE_DIRECTORY)})
         self.QTHREADS[f"serial-{index}"].tag_data.connect(self.on_tag_data)
         self.QTHREADS[f"serial-{index}"].serial_connected.connect(self.on_serial_connected)
+        self.QTHREADS[f"serial-{index}"].serial_disconnected.connect(self.on_serial_disconnected)
         self.QTHREADS[f"serial-{index}"].start()
         
     def stop_serial_connection(self, index):
@@ -222,6 +229,7 @@ class RtlsUwbApplication(QWidget):
         self.QTHREADS[f"serial-{index}"].stop()
         self.findChild(QPushButton, f"btn_disconnect_{index}").setHidden(True)
         self.QTHREADS[f"serial-{index}"].wait()
+        self.findChild(QComboBox, f"cmb_comport_colour_{index}").setEnabled(True)
         self.findChild(QPushButton, f"btn_connect_{index}").setHidden(False)
         self.findChild(QLineEdit, f"baudrate_{index}").setEnabled(True)
         self.findChild(QCheckBox, f"chk_logging_{index}").setEnabled(True)
@@ -240,6 +248,10 @@ class RtlsUwbApplication(QWidget):
     def on_serial_connected(self, index):
         # Enable the disconnect button when serial is connected
         self.findChild(QPushButton, f"btn_disconnect_{index}").setEnabled(True)
+
+    def on_serial_disconnected(self, index):
+        # If the serial device loses connection, stop the thread and clean up the connection.
+        self.stop_serial_connection(index)
         
     def redraw_plot(self):
         # Clear Plot

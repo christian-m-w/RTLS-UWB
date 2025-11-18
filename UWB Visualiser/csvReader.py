@@ -6,9 +6,11 @@ from utils.tagDataUtils import TagDataUtils
 
 class CsvReader(QThread):
     tag_data = pyqtSignal(TagData, str)
+    replay_stopped = pyqtSignal(int)
 
-    def __init__(self, CSV_FILE):
+    def __init__(self, INDEX, CSV_FILE):
         super().__init__()
+        self.INDEX = INDEX
         self.CSV_FILE = CSV_FILE
 
     def run(self):
@@ -42,6 +44,9 @@ class CsvReader(QThread):
                 except ValueError as e:
                     print(f"Skipping row due to error: {e}")
                     continue
+
+            # Signal the end of file has been reached
+            self.replay_stopped.emit(self.INDEX)
 
     def stop(self):
         self.running = False
